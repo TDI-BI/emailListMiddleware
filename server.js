@@ -71,9 +71,14 @@ app.get("/", (req, res) => {
 });
 
 app.get("/group", async (req, res) => {
+
+    const inid = req.query.id
+
     const groupById = await getGroupMembers(
-        "72592f8f-6cd5-45b4-9a6f-d23ffb859ec4"
+        inid
     ); // need to actually pull user infoge
+
+    if(groupById==null){ res.status(500); return;}
 
     res.json({
         groupById,
@@ -85,6 +90,9 @@ app.get("/groups", async (req, res) => {
     const ret = groups.map((e) => {
         return { id: e.id, desc: e.displayName, mail: e.mail };
     });
+
+    if(ret==null){ res.status(500); return;}
+
     res.json({
         ret,
     });
