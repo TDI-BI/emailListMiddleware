@@ -1,7 +1,9 @@
 const express = require("express");
 require("dotenv").config();
 const axios = require("axios");
+const apicache = require('apicache');
 const app = express();
+const cache = apicache.middleware;
 
 //helper functions
 const getAccessToken = async () => {
@@ -70,7 +72,7 @@ app.get("/", (req, res) => {
     );
 });
 
-app.get("/group", async (req, res) => {
+app.get("/group", cache('1 hour'), async (req, res) => {
 
     const inid = req.query.id
 
@@ -85,7 +87,7 @@ app.get("/group", async (req, res) => {
     });
 });
 
-app.get("/groups", async (req, res) => {
+app.get("/groups", cache('1 hour'), async (req, res) => {
     const groups = await getGroups();
     const ret = groups.map((e) => {
         return { id: e.id, desc: e.displayName, mail: e.mail };
