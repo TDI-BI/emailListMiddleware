@@ -1,7 +1,7 @@
 const express = require("express");
 require("dotenv").config();
 const axios = require("axios");
-const apicache = require('apicache');
+const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
 
@@ -72,32 +72,61 @@ app.get("/", (req, res) => {
     );
 });
 
-app.get("/group", cache('1 hour'), async (req, res) => {
+app.get("/group", cache("1 hour"), async (req, res) => {
+    const inid = req.query.id;
 
-    const inid = req.query.id
+    const groupById = await getGroupMembers(inid); // need to actually pull user infoge
 
-    const groupById = await getGroupMembers(
-        inid
-    ); // need to actually pull user infoge
-
-    if(groupById==null){ res.status(500); return;}
+    if (groupById == null) {
+        res.status(500);
+        return;
+    }
 
     res.json({
         groupById,
     });
 });
 
-app.get("/groups", cache('1 hour'), async (req, res) => {
-    const groups = await getGroups();
-    const ret = groups.map((e) => {
-        return { id: e.id, desc: e.displayName, mail: e.mail };
-    });
+app.get("/groups", cache("1 hour"), async (req, res) => {
+    const WECAREABOUT = [
+        "Travel",
+        "Designated Person Ashore",
+        "Tech",
+        "Daily Progress Report",
+        "Operations",
+        "Acctspayable",
+        "Survey Processing",
+        "Movements",
+        "IT",
+        "Logistics",
+        "Accounts Payable",
+        "Survey Technical",
+        "Resupply",
+        "Marketing",
+        "Crew Documentation",
+        "Information Technology",
+    ];
 
-    if(ret==null){ res.status(500); return;}
+    const groups = await getGroups();
+    const ret = groups
+        .filter((itm) => WECAREABOUT.includes(itm.displayName))
+        .map((e) => ({ id: e.id, desc: e.displayName, mail: e.mail }));
+
+    if (ret == null) {
+        res.status(500);
+        return;
+    }
 
     res.json({
         ret,
     });
+});
+
+// we are gonna transition cache to 24 hours,
+// then we are going to create this as a route to clear cache and regenerate at like 12pm every day?
+// call via crom task with some auth password or something
+app.get("/mkcache", async (req, res) => {
+    //gets all groups then gets all /group
 });
 
 app.listen(1902);
