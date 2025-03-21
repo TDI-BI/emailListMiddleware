@@ -4,6 +4,13 @@ const axios = require("axios");
 const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
+const cors = require('cors');
+
+app.use(cors({
+    origin:'*',
+    methods:['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders:['Content-Type', 'Authorization'],
+}))
 
 //helper functions
 const getAccessToken = async () => {
@@ -66,7 +73,6 @@ const getGroups = async () => {
 };
 
 app.get("/", (req, res) => {
-    console.log("root url");
     res.send(
         "haiii<br></br>to see email groups use ./group<br></br>to see all groups use ./groups"
     );
@@ -119,6 +125,53 @@ app.get("/groups", cache("1 hour"), async (req, res) => {
 
     res.json({
         ret,
+    });
+});
+
+const getGroupByName = async (maillistName) => {
+    // throws error but who cares, connection clearly established
+    const token = await getAccessToken();
+    if (!token) return null;
+
+    try {
+        const responseG = await axios.get(
+            `${process.env.GRAPH_API_URL}/groups?$filter=mail eq '${maillistName}@tdi-bi.com'`,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
+        if (responseG.data.value==null) throw "no such group exists";
+        const groupId = responseG.data.value[0].id
+        
+        const responseM = await axios.get(
+            `${process.env.GRAPH_API_URL}/groups/${groupId}/members`,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
+        
+        return responseM.data.value
+
+    } catch (e) {
+        console.error("error fetching data:", e.response?.data || e.message);
+        return null;
+    }
+};
+
+
+app.get("/groupByName", async (req, res) => {
+
+    const name = req.query.name;
+
+    const group = await getGroupByName(name);
+
+    if (group == null) {
+        res.status(500);
+        return;
+    }
+
+    res.json({
+        group
     });
 });
 
