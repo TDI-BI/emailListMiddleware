@@ -4,13 +4,18 @@ const axios = require("axios");
 const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
-const cors = require('cors');
+const cors = require("cors");
 
-app.use(cors({
-    origin:'*',
-    methods:['GET','POST','PUT','DELETE','OPTIONS'],
-    allowedHeaders:['Content-Type', 'Authorization'],
-}))
+app.use(
+    cors({
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    })
+);
+//lets me pass extra stuff in posts
+app.use(express.json());
+app.use(express.urlencoded({extended:true}));
 
 //helper functions
 const getAccessToken = async () => {
@@ -107,26 +112,19 @@ const mkEmail = async (from, body) => {
 
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(
-                `Token request failed: ${JSON.stringify(data)}`
-            );
+            throw new Error(`Token request failed: ${JSON.stringify(data)}`);
         }
 
         return data.access_token;
     };
 
-    const sendEmail = async (
-        accessToken,
-        fromUserEmail,
-        toAddress
-    ) => {
+    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
         const emailBody = {
             message: {
                 subject: "Ignore this",
                 body: {
-                    contentType: "Text",
-                    content:
-                        body,
+                    contentType: "HTML",
+                    content: body,
                 },
                 toRecipients: [
                     {
@@ -161,12 +159,16 @@ const mkEmail = async (from, body) => {
 
     try {
         const token = await getAccessToken();
-        await sendEmail(token, "brooksmccall@tdi-bi.com", "parkerseeley@tdi-bi.com");
+        await sendEmail(
+            token,
+            "brooksmccall@tdi-bi.com",
+            "parkerseeley@tdi-bi.com"
+        );
     } catch (err) {
         console.error("Error:", err);
     }
 };
- 
+
 app.get("/", (req, res) => {
     res.send(
         "haiii<br></br>to see email groups use ./group<br></br>to see all groups use ./groups"
@@ -235,27 +237,24 @@ const getGroupByName = async (maillistName) => {
                 headers: { Authorization: `Bearer ${token}` },
             }
         );
-        if (responseG.data.value==null) throw "no such group exists";
-        const groupId = responseG.data.value[0].id
-        
+        if (responseG.data.value == null) throw "no such group exists";
+        const groupId = responseG.data.value[0].id;
+
         const responseM = await axios.get(
             `${process.env.GRAPH_API_URL}/groups/${groupId}/members`,
             {
                 headers: { Authorization: `Bearer ${token}` },
             }
         );
-        
-        return responseM.data.value
 
+        return responseM.data.value;
     } catch (e) {
         console.error("error fetching data:", e.response?.data || e.message);
         return null;
     }
 };
 
-
 app.get("/groupByName", async (req, res) => {
-
     const name = req.query.name;
 
     const group = await getGroupByName(name);
@@ -266,19 +265,23 @@ app.get("/groupByName", async (req, res) => {
     }
 
     res.json({
-        group
+        group,
     });
 });
 
-app.get("/testEmail", async (req,res)=>{
-    const body = req.query.body;
+app.post("/testEmail", async (req, res) => {
+    console.log("opening script");
     const from = req.body.from;
-    mkEmail('parkerseeley@tdi-bi.com', 'this is my new test body passed as a parameter');
-    mkEmail(from, body); // bweh
-    res.send(
-        "haiii<br></br>sending youre email..."
+    const body = req.body.body
+    /*
+    mkEmail(
+        "parkerseeley@tdi-bi.com",
+        "this is my new test body passed as a parameter"
     );
-})
+    */
+    mkEmail(from, body); // fire off email
+    res.send("haiii<br></br>sending youre email...");
+});
 
 // we are gonna transition cache to 24 hours,
 // then we are going to create this as a route to clear cache and regenerate at like 12pm every day?
