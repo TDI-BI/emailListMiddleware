@@ -80,19 +80,6 @@ const getGroups = async () => {
 //WE ARE TESTING THIS RN
 //this is a little weird because i just copied it out of a typescript file, thats why (for now) there are some repeat functions. I will want to rewrite all this before deploying to clean up the express app
 const mkEmail = async (from, body) => {
-    // pnp/sp/emails doesnt actually work because it sends from an out of tdi email address & cant send to mailing lists :( if it did work it would look something like it does below
-    /*
-    if(!_sp) {console.error('sp undefined'); return;}
-    const emailProps : IEmailProperties = {
-        To:['it@tdi-bi.com'],
-        Subject:'ignore this',
-        Body:'this is a test email sent by parker from sharepoint & pnp/sp'
-    }
-    await _sp.utility.sendEmail(emailProps)
-    console.log('email sent! check inbox')
-    */
-    //graph solution for midware
-
     const getAccessToken = async () => {
         const params = new URLSearchParams();
         params.append("grant_type", "client_credentials");
@@ -121,18 +108,16 @@ const mkEmail = async (from, body) => {
     const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
         const emailBody = {
             message: {
-                subject: "Ignore this",
+                subject: "SPR Email Format Demo Correction",
                 body: {
                     contentType: "HTML",
                     content: body,
                 },
-                toRecipients: [
-                    {
-                        emailAddress: {
-                            address: toAddress,
-                        },
+                toRecipients: toAddress.map(address => ({
+                    emailAddress: {
+                        address: address,
                     },
-                ],
+                })),
             },
             saveToSentItems: false,
         };
@@ -156,13 +141,12 @@ const mkEmail = async (from, body) => {
 
         console.log("Email sent successfully!");
     };
-
     try {
         const token = await getAccessToken();
         await sendEmail(
             token,
-            "brooksmccall@tdi-bi.com",
-            "parkerseeley@tdi-bi.com"
+            from,
+            ["parkerseeley@tdi-bi.com"]//, "kevindavis@tdi-bi.com",'danvitale@tdi-bi.com']
         );
     } catch (err) {
         console.error("Error:", err);
@@ -237,7 +221,7 @@ const getGroupByName = async (maillistName) => {
                 headers: { Authorization: `Bearer ${token}` },
             }
         );
-        if (responseG.data.value == null) throw "no such group exists";
+        if (responseG.data.value == null) console.error( "no such group exists");
         const groupId = responseG.data.value[0].id;
 
         const responseM = await axios.get(
@@ -282,7 +266,7 @@ app.post("/testEmail", async (req, res) => {
         "this is my new test body passed as a parameter"
     );
     */
-    mkEmail(from, body); // fire off email
+    await mkEmail(from, body); // fire off email
     res.send("haiii<br></br>sending youre email...");
 });
 
