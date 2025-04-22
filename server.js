@@ -273,6 +273,9 @@ app.post("/testEmail", async (req, res) => {
     console.log("opening script");
     const from = req.body.from;
     const body = req.body.body
+    //debugging lines
+    //console.log(from);
+    //console.log(body);  
     /*
     mkEmail(
         "parkerseeley@tdi-bi.com",
