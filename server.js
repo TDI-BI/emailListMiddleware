@@ -89,6 +89,7 @@ app.get("/group", cache("1 hour"), async (req, res) => {
 
 app.get("/groups", cache("1 hour"), async (req, res) => {
     const WECAREABOUT = [
+				"Marine",
         "Travel",
         "Designated Person Ashore",
         "Tech",
