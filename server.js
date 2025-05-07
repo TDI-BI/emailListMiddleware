@@ -257,15 +257,6 @@ app.post("/testEmail", async (req, res) => {
     console.log("opening script");
     const from = req.body.from;
     const body = req.body.body
-    //debugging lines
-    //console.log(from);
-    //console.log(body);  
-    /*
-    mkEmail(
-        "parkerseeley@tdi-bi.com",
-        "this is my new test body passed as a parameter"
-    );
-    */
     await mkEmail(from, body); // fire off email
     res.send("haiii<br></br>sending youre email...");
 });
