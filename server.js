@@ -262,16 +262,9 @@ app.post("/testEmail", async (req, res) => {
     res.send("haiii<br></br>sending youre email...");
 });
 
-app.post('/tstPdf', async (req,res)=>{
-   console.log('u made it here')
-   res.send('<div>h-hewwo..,,<div>')
-});
-
-// we are gonna transition cache to 24 hours,
-// then we are going to create this as a route to clear cache and regenerate at like 12pm every day?
-// call via crom task with some auth password or something
-app.get("/mkcache", async (req, res) => {
-    //gets all groups then gets all /group
+app.post("/testPdf", async (req, res) => {
+    console.log("opening script");
+    res.send("haiii<br></br>sending youre email...");
 });
 
 app.listen(1902);
