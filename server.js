@@ -9,7 +9,7 @@ const puppeteer = require("puppeteer");
 
 //lets me pass extra stuff in posts
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({extended: true}));
 
 app.get('/favicon.ico', (req, res) => res.status(204).end()); // make my browser shut the fuck up
 
@@ -24,7 +24,7 @@ const getAccessToken = async () => {
     });
     try {
         const response = await axios.post(tokenUrl, params, {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
         });
         return response.data.access_token;
     } catch (e) {
@@ -44,7 +44,7 @@ const getGroupMembers = async (groupId) => {
         const response = await axios.get(
             `${process.env.GRAPH_API_URL}/groups/${groupId}/members`,
             {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             }
         );
         return response.data.value;
@@ -63,7 +63,7 @@ const getGroups = async () => {
         const response = await axios.get(
             `${process.env.GRAPH_API_URL}/groups`,
             {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             }
         );
         return response.data.value;
@@ -96,7 +96,7 @@ app.get("/group", cache("1 hour"), async (req, res) => {
 
 app.get("/groups", cache("1 hour"), async (req, res) => {
     const WECAREABOUT = [
-				"Marine",
+        "Marine",
         "Travel",
         "Designated Person Ashore",
         "Tech",
@@ -118,7 +118,7 @@ app.get("/groups", cache("1 hour"), async (req, res) => {
     const groups = await getGroups();
     const ret = groups
         .filter((itm) => WECAREABOUT.includes(itm.displayName))
-        .map((e) => ({ id: e.id, desc: e.displayName, mail: e.mail }));
+        .map((e) => ({id: e.id, desc: e.displayName, mail: e.mail}));
 
     if (ret == null) {
         res.status(500);
@@ -139,16 +139,16 @@ const getGroupByName = async (maillistName) => {
         const responseG = await axios.get(
             `${process.env.GRAPH_API_URL}/groups?$filter=mail eq '${maillistName}@tdi-bi.com'`,
             {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             }
         );
-        if (responseG.data.value == null) console.error( "no such group exists");
+        if (responseG.data.value == null) console.error("no such group exists");
         const groupId = responseG.data.value[0].id;
 
         const responseM = await axios.get(
             `${process.env.GRAPH_API_URL}/groups/${groupId}/members`,
             {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             }
         );
 
@@ -222,10 +222,11 @@ const mkEmail = async (from, body, toAddress) => {
     };
 
     const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
-        const attachment = generatePdfBuffer(body)
+        const attachmentBuffer = await generatePdfBuffer(body)
+        const attachment = attachmentBuffer.toString("base64");
         const emailBody = {
             message: {
-                subject: `BMCC-SPR-${(new Date()).toISOString().slice(0,10)}`,
+                subject: `BMCC-SPR-${(new Date()).toISOString().slice(0, 10)}`,
                 body: {
                     contentType: "HTML",
                     content: body,
@@ -235,6 +236,14 @@ const mkEmail = async (from, body, toAddress) => {
                         address: address,
                     },
                 })),
+                attachments: [
+                    {
+                        "@odata.type": "#microsoft.graph.fileAttachment",
+                        name: `BMCC-SPR-${(new Date()).toISOString().slice(0, 10)}`,
+                        contentType: "application/pdf",
+                        contentBytes: attachment,
+                    }
+                ],
             },
             saveToSentItems: false,
         };
@@ -281,7 +290,7 @@ app.post("/testEmail", async (req, res) => {
 });
 
 app.get("/testroute1", async (req, res) => {
-    res.json({'msg':'madeit!'})
+    res.json({'msg': 'madeit!'})
 });
 
 app.listen(1902);
