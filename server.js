@@ -4,15 +4,10 @@ const axios = require("axios");
 const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
-const cors = require("cors");
+//would enable cors, we handle this in nginx now
+//const cors = require('cors');
+//app.use(cors());
 
-app.use(
-    cors({
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-    })
-);
 //lets me pass extra stuff in posts
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
@@ -79,7 +74,7 @@ const getGroups = async () => {
 
 //WE ARE TESTING THIS RN
 //this is a little weird because i just copied it out of a typescript file, thats why (for now) there are some repeat functions. I will want to rewrite all this before deploying to clean up the express app
-const mkEmail = async (from, body) => {
+const mkEmail = async (from, body, toAddress) => {
     const getAccessToken = async () => {
         const params = new URLSearchParams();
         params.append("grant_type", "client_credentials");
@@ -108,7 +103,7 @@ const mkEmail = async (from, body) => {
     const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
         const emailBody = {
             message: {
-                subject: "SPR Email Format Demo Correction",
+							subject: `BMCC-SPR-${(new Date()).toISOString().slice(0,10)}`,
                 body: {
                     contentType: "HTML",
                     content: body,
@@ -146,7 +141,7 @@ const mkEmail = async (from, body) => {
         await sendEmail(
             token,
             from,
-            ["parkerseeley@tdi-bi.com"]//, "kevindavis@tdi-bi.com",'danvitale@tdi-bi.com']
+            [toAddress]//, GROUPS WORK!
         );
     } catch (err) {
         console.error("Error:", err);
@@ -257,8 +252,9 @@ app.get("/groupByName", async (req, res) => {
 app.post("/testEmail", async (req, res) => {
     console.log("opening script");
     const from = req.body.from;
-    const body = req.body.body
-    await mkEmail(from, body); // fire off email
+    const body = req.body.body;
+		const to = req.body.to;
+    await mkEmail(from, body, to); // fire off email
     res.send("haiii<br></br>sending youre email...");
 });
 
