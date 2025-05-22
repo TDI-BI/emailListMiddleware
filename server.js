@@ -4,16 +4,9 @@ const axios = require("axios");
 const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
-const cors = require("cors");
+//const cors = require("cors");
 const puppeteer = require("puppeteer");
 
-app.use(
-    cors({
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-    })
-);
 //lets me pass extra stuff in posts
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
@@ -77,6 +70,80 @@ const getGroups = async () => {
     } catch (e) {
         console.error("error fetching data:", e.response?.data || e.message);
         return null;
+    }
+};
+
+const mkEmail = async (from, body, toAddress) => {
+    const getAccessToken = async () => {
+        const params = new URLSearchParams();
+        params.append("grant_type", "client_credentials");
+        params.append("client_id", process.env.CLIENTID);
+        params.append("client_secret", process.env.CLIENTSECRET);
+        params.append("scope", "https://graph.microsoft.com/.default");
+        const response = await fetch(
+            `https://login.microsoftonline.com/${process.env.TENANTID}/oauth2/v2.0/token`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: params.toString(),
+            }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Token request failed: ${JSON.stringify(data)}`);
+        }
+
+        return data.access_token;
+    };
+
+    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
+        const emailBody = {
+            message: {
+							subject: `BMCC-SPR-${(new Date()).toISOString().slice(0,10)}`,
+                body: {
+                    contentType: "HTML",
+                    content: body,
+                },
+                toRecipients: toAddress.map(address => ({
+                    emailAddress: {
+                        address: address,
+                    },
+                })),
+            },
+            saveToSentItems: false,
+        };
+
+        const response = await fetch(
+            `https://graph.microsoft.com/v1.0/users/${from}/sendMail`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(emailBody),
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
+        }
+
+        console.log("Email sent successfully!");
+    };
+    try {
+        const token = await getAccessToken();
+        await sendEmail(
+            token,
+            from,
+            [toAddress]//, GROUPS WORK!
+        );
+    } catch (err) {
+        console.error("Error:", err);
     }
 };
 
@@ -202,89 +269,13 @@ const generatePdfBuffer = async (htmlStr) => {
     return pdfBuffer;
 }
 
-//WE ARE TESTING THIS RN
-//this is a little weird because i just copied it out of a typescript file, thats why (for now) there are some repeat functions. I will want to rewrite all this before deploying to clean up the express app
-const mkEmail = async (from, body) => {
-    const getAccessToken = async () => {
-        const params = new URLSearchParams();
-        params.append("grant_type", "client_credentials");
-        params.append("client_id", process.env.CLIENTID);
-        params.append("client_secret", process.env.CLIENTSECRET);
-        params.append("scope", "https://graph.microsoft.com/.default");
-        const response = await fetch(
-            `https://login.microsoftonline.com/${process.env.TENANTID}/oauth2/v2.0/token`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: params.toString(),
-            }
-        );
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(`Token request failed: ${JSON.stringify(data)}`);
-        }
-
-        return data.access_token;
-    };
-
-    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
-        const emailBody = {
-            message: {
-                subject: "SPR Email Format Demo Correction",
-                body: {
-                    contentType: "HTML",
-                    content: body,
-                },
-                toRecipients: toAddress.map(address => ({
-                    emailAddress: {
-                        address: address,
-                    },
-                })),
-            },
-            saveToSentItems: false,
-        };
-
-        const response = await fetch(
-            `https://graph.microsoft.com/v1.0/users/${from}/sendMail`,
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(emailBody),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
-        }
-
-        console.log("Email sent successfully!");
-    };
-    try {
-        const token = await getAccessToken();
-        await sendEmail(
-            token,
-            from,
-            ["parkerseeley@tdi-bi.com"]
-        );
-    } catch (err) {
-        console.error("Error:", err);
-    }
-};
-
 
 app.post("/testEmail", async (req, res) => {
     console.log("fewhhhh we are local :D");
     const from = req.body.from;
     const body = req.body.body;
-    
-    await mkEmail(from, body); // fire off email
+    const to = req.body.to;
+    await mkEmail(from, body, to); // fire off email
     res.send("haiii<br></br>sending youre email...");
 });
 
