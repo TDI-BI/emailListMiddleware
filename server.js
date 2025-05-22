@@ -73,83 +73,9 @@ const getGroups = async () => {
     }
 };
 
-const mkEmail = async (from, body, toAddress) => {
-    const getAccessToken = async () => {
-        const params = new URLSearchParams();
-        params.append("grant_type", "client_credentials");
-        params.append("client_id", process.env.CLIENTID);
-        params.append("client_secret", process.env.CLIENTSECRET);
-        params.append("scope", "https://graph.microsoft.com/.default");
-        const response = await fetch(
-            `https://login.microsoftonline.com/${process.env.TENANTID}/oauth2/v2.0/token`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: params.toString(),
-            }
-        );
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(`Token request failed: ${JSON.stringify(data)}`);
-        }
-
-        return data.access_token;
-    };
-
-    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
-        const emailBody = {
-            message: {
-							subject: `BMCC-SPR-${(new Date()).toISOString().slice(0,10)}`,
-                body: {
-                    contentType: "HTML",
-                    content: body,
-                },
-                toRecipients: toAddress.map(address => ({
-                    emailAddress: {
-                        address: address,
-                    },
-                })),
-            },
-            saveToSentItems: false,
-        };
-
-        const response = await fetch(
-            `https://graph.microsoft.com/v1.0/users/${from}/sendMail`,
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(emailBody),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
-        }
-
-        console.log("Email sent successfully!");
-    };
-    try {
-        const token = await getAccessToken();
-        await sendEmail(
-            token,
-            from,
-            [toAddress]//, GROUPS WORK!
-        );
-    } catch (err) {
-        console.error("Error:", err);
-    }
-};
-
 app.get("/", (req, res) => {
     res.send(
-        "haiii<br></br>to see email groups use ./group<br></br>to see all groups use ./groups"
+        "haiii<br>to see email groups use ./group<br>to see all groups use ./groups"
     );
 });
 
@@ -268,6 +194,81 @@ const generatePdfBuffer = async (htmlStr) => {
     await browser.close();
     return pdfBuffer;
 }
+
+const mkEmail = async (from, body, toAddress) => {
+    const getAccessToken = async () => {
+        const params = new URLSearchParams();
+        params.append("grant_type", "client_credentials");
+        params.append("client_id", process.env.CLIENTID);
+        params.append("client_secret", process.env.CLIENTSECRET);
+        params.append("scope", "https://graph.microsoft.com/.default");
+        const response = await fetch(
+            `https://login.microsoftonline.com/${process.env.TENANTID}/oauth2/v2.0/token`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: params.toString(),
+            }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Token request failed: ${JSON.stringify(data)}`);
+        }
+
+        return data.access_token;
+    };
+
+    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
+        const attachment = generatePdfBuffer(body)
+        const emailBody = {
+            message: {
+                subject: `BMCC-SPR-${(new Date()).toISOString().slice(0,10)}`,
+                body: {
+                    contentType: "HTML",
+                    content: body,
+                },
+                toRecipients: toAddress.map(address => ({
+                    emailAddress: {
+                        address: address,
+                    },
+                })),
+            },
+            saveToSentItems: false,
+        };
+
+        const response = await fetch(
+            `https://graph.microsoft.com/v1.0/users/${from}/sendMail`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(emailBody),
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
+        }
+
+        console.log("Email sent successfully!");
+    };
+    try {
+        const token = await getAccessToken();
+        await sendEmail(
+            token,
+            from,
+            [toAddress]//, GROUPS WORK!
+        );
+    } catch (err) {
+        console.error("Error:", err);
+    }
+};
 
 
 app.post("/testEmail", async (req, res) => {
