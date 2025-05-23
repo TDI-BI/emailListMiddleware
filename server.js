@@ -197,40 +197,69 @@ const generatePdfBuffer = async (htmlStr) => {
 
     await browser.close();
 
-    /* debugging stuff
-        console.log('Buffer type:', typeof attachmentBuffer);
-        console.log('Is Buffer:', Buffer.isBuffer(attachmentBuffer));
-        console.log('Constructor name:', attachmentBuffer.constructor.name);
-        console.log('Buffer length:', attachmentBuffer.length);
-        */
-
-    // Ensure we have a proper Buffer - this is error handling written by claude idrk whats going on here
-    let properBuffer;
+    // Ensure we return a real Buffer
     if (Buffer.isBuffer(pdfBuffer)) {
-        properBuffer = pdfBuffer;
+        return pdfBuffer;
     } else if (pdfBuffer instanceof Uint8Array) {
-        // Convert Uint8Array to Buffer if needed
-        properBuffer = Buffer.from(pdfBuffer);
+        return Buffer.from(pdfBuffer);
     } else {
         throw new Error('Unexpected buffer type received from generatePdfBuffer');
     }
-
-
-    // Verify the base64 string looks correct (should not contain commas)
-    /* more debugging
-    console.log('Base64 string length:', base64Pdf.length);
-    console.log('Base64 preview (first 100 chars):', base64Pdf.substring(0, 100));
-    console.log('Contains commas:', base64Pdf.includes(','));
-    */
-
-    // Convert to base64
-    return properBuffer.toString("base64");
 }
 
-const uploadPdf = async (buff, accessToken, title, sharepointSiteUrl) => {
+const uploadPdf = async (buff, accessToken, title, spSiteName) => {
+    const libName = 'Spr Reports';
 
-    return ;
-}
+    const siteRes = await fetch(`https://graph.microsoft.com/v1.0/sites?search=${encodeURIComponent(spSiteName)}`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    const siteData = await siteRes.json();
+    if (!siteRes.ok || !siteData.value || siteData.value.length === 0) {
+        throw new Error(`Could not find site with title "${spSiteName}": ${JSON.stringify(siteData)}`);
+    }
+
+    const siteId = siteData.value[0].id;
+
+    const drivesRes = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drives`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    const drivesData = await drivesRes.json();
+    const drive = drivesData.value.find(d => d.name === libName);
+    if (!drive) {
+        throw new Error(`Drive "${libName}" not found in site ${spSiteName}`);
+    }
+
+    const driveId = drive.id;
+
+    // Step 3: Upload the file to the root of the document library
+    const uploadRes = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${title}.pdf:/content`, {
+        method: "PUT",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/pdf",
+        },
+        body: buff,
+    });
+
+    if (!uploadRes.ok) {
+        const error = await uploadRes.text();
+        throw new Error(`Upload failed: ${uploadRes.status} ${error}`);
+    }
+
+    const uploadedFile = await uploadRes.json();
+    return uploadedFile;
+};
+
 
 const mkEmail = async (from, body, toAddress) => {
     const getAccessToken = async () => {
@@ -260,11 +289,17 @@ const mkEmail = async (from, body, toAddress) => {
 
     const sendEmail = async (accessToken, fromUserEmail, toAddress, body) => {
         const attachmentBuffer = await generatePdfBuffer(body);
+        const title = `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`
+        //buff, accessToken, title, spSiteName
+        const resp = await uploadPdf(attachmentBuffer, accessToken, title, 'ShipDash_DevEnv');
+        console.log('pdf upload', resp)
 
+        //cast to base64 so i can email it document
+        const base64Attachment = attachmentBuffer.toString("base64");
 
         const emailBody = {
             message: {
-                subject: `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`,
+                subject: title,
                 body: {
                     contentType: "HTML",
                     content: body,
@@ -277,9 +312,9 @@ const mkEmail = async (from, body, toAddress) => {
                 attachments: [
                     {
                         "@odata.type": "#microsoft.graph.fileAttachment",
-                        name: `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`,
+                        name: title,
                         contentType: "application/pdf",
-                        contentBytes: attachmentBuffer,
+                        contentBytes: base64Attachment,
                     }
                 ],
             },
@@ -312,7 +347,7 @@ const mkEmail = async (from, body, toAddress) => {
             token,
             from,
             [toAddress]//, GROUPS WORK!
-            ,body
+            , body
         );
     } catch (err) {
         console.error("Error:", err);
