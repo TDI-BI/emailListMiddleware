@@ -2,14 +2,17 @@ const express = require("express");
 require("dotenv").config();
 const axios = require("axios");
 const apicache = require("apicache");
+
 const app = express();
 const cache = apicache.middleware;
 
 const puppeteer = require("puppeteer");
 
+if(process.env.PROD !='true'){
 //we need this when running local dev env :p
-const cors = require("cors");
-app.use(cors())
+	const cors = require("cors");
+	app.use(cors())
+}
 
 //lets me pass extra stuff in posts
 app.use(express.json());
