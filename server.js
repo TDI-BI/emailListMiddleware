@@ -4,8 +4,12 @@ const axios = require("axios");
 const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
-//const cors = require("cors");
+
 const puppeteer = require("puppeteer");
+
+//we need this when running local dev env :p
+const cors = require("cors");
+app.use(cors())
 
 //lets me pass extra stuff in posts
 app.use(express.json());
@@ -192,7 +196,40 @@ const generatePdfBuffer = async (htmlStr) => {
     });
 
     await browser.close();
-    return pdfBuffer;
+
+    /* debugging stuff
+        console.log('Buffer type:', typeof attachmentBuffer);
+        console.log('Is Buffer:', Buffer.isBuffer(attachmentBuffer));
+        console.log('Constructor name:', attachmentBuffer.constructor.name);
+        console.log('Buffer length:', attachmentBuffer.length);
+        */
+
+    // Ensure we have a proper Buffer - this is error handling written by claude idrk whats going on here
+    let properBuffer;
+    if (Buffer.isBuffer(pdfBuffer)) {
+        properBuffer = pdfBuffer;
+    } else if (pdfBuffer instanceof Uint8Array) {
+        // Convert Uint8Array to Buffer if needed
+        properBuffer = Buffer.from(pdfBuffer);
+    } else {
+        throw new Error('Unexpected buffer type received from generatePdfBuffer');
+    }
+
+
+    // Verify the base64 string looks correct (should not contain commas)
+    /* more debugging
+    console.log('Base64 string length:', base64Pdf.length);
+    console.log('Base64 preview (first 100 chars):', base64Pdf.substring(0, 100));
+    console.log('Contains commas:', base64Pdf.includes(','));
+    */
+
+    // Convert to base64
+    return properBuffer.toString("base64");
+}
+
+const uploadPdf = async (buff, accessToken, title, sharepointSiteUrl) => {
+
+    return ;
 }
 
 const mkEmail = async (from, body, toAddress) => {
@@ -221,12 +258,13 @@ const mkEmail = async (from, body, toAddress) => {
         return data.access_token;
     };
 
-    const sendEmail = async (accessToken, fromUserEmail, toAddress) => {
-        const attachmentBuffer = await generatePdfBuffer(body)
-        const attachment = attachmentBuffer.toString("base64");
+    const sendEmail = async (accessToken, fromUserEmail, toAddress, body) => {
+        const attachmentBuffer = await generatePdfBuffer(body);
+
+
         const emailBody = {
             message: {
-                subject: `BMCC-SPR-${(new Date()).toISOString().slice(0, 10)}`,
+                subject: `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`,
                 body: {
                     contentType: "HTML",
                     content: body,
@@ -239,17 +277,16 @@ const mkEmail = async (from, body, toAddress) => {
                 attachments: [
                     {
                         "@odata.type": "#microsoft.graph.fileAttachment",
-                        name: `BMCC-SPR-${(new Date()).toISOString().slice(0, 10)}`,
+                        name: `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`,
                         contentType: "application/pdf",
-                        contentBytes: attachment,
+                        contentBytes: attachmentBuffer,
                     }
                 ],
             },
             saveToSentItems: false,
         };
-
         const response = await fetch(
-            `https://graph.microsoft.com/v1.0/users/${from}/sendMail`,
+            `https://graph.microsoft.com/v1.0/users/${fromUserEmail}/sendMail`,
             {
                 method: "POST",
                 headers: {
@@ -259,20 +296,23 @@ const mkEmail = async (from, body, toAddress) => {
                 body: JSON.stringify(emailBody),
             }
         );
+        console.log('Response:', response);
 
         if (!response.ok) {
             const error = await response.json();
             throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
         }
 
-        console.log("Email sent successfully!");
+        console.log("Email with PDF attachment sent successfully!");
     };
-    try {
+
+    try { // call our functions
         const token = await getAccessToken();
         await sendEmail(
             token,
             from,
             [toAddress]//, GROUPS WORK!
+            ,body
         );
     } catch (err) {
         console.error("Error:", err);
@@ -283,7 +323,7 @@ const mkEmail = async (from, body, toAddress) => {
 app.post("/testEmail", async (req, res) => {
     console.log("fewhhhh we are local :D");
     const from = req.body.from;
-    const body = req.body.body;
+    const body = req.body.body; // err here?
     const to = req.body.to;
     await mkEmail(from, body, to); // fire off email
     res.send("haiii<br></br>sending youre email...");
