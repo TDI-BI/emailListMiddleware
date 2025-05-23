@@ -261,7 +261,7 @@ const uploadPdf = async (buff, accessToken, title, spSiteName) => {
 };
 
 
-const mkEmail = async (from, body, toAddress) => {
+const mkEmail = async (from, body, toAddress, siteId) => {
     const getAccessToken = async () => {
         const params = new URLSearchParams();
         params.append("grant_type", "client_credentials");
@@ -287,11 +287,11 @@ const mkEmail = async (from, body, toAddress) => {
         return data.access_token;
     };
 
-    const sendEmail = async (accessToken, fromUserEmail, toAddress, body) => {
+    const sendEmail = async (accessToken, fromUserEmail, toAddress, body, siteId) => {
         const attachmentBuffer = await generatePdfBuffer(body);
         const title = `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`
         //buff, accessToken, title, spSiteName
-        const resp = await uploadPdf(attachmentBuffer, accessToken, title, 'ShipDash_DevEnv');
+        const resp = await uploadPdf(attachmentBuffer, accessToken, title, siteId);
         console.log('pdf upload', resp)
 
         //cast to base64 so i can email it document
@@ -346,8 +346,9 @@ const mkEmail = async (from, body, toAddress) => {
         await sendEmail(
             token,
             from,
-            [toAddress]//, GROUPS WORK!
-            , body
+            [toAddress],//, GROUPS WORK!
+            body,
+            siteId,
         );
     } catch (err) {
         console.error("Error:", err);
@@ -360,8 +361,9 @@ app.post("/testEmail", async (req, res) => {
     const from = req.body.from;
     const body = req.body.body; // err here?
     const to = req.body.to;
-    await mkEmail(from, body, to); // fire off email
-    res.send("haiii<br></br>sending youre email...");
+    const siteId = req.body.site;
+    await mkEmail(from, body, to, siteId); // fire off email
+    res.send("haiii<br></br>sending you, sitedre email...");
 });
 
 app.get("/testroute1", async (req, res) => {
