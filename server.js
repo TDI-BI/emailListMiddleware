@@ -6,6 +6,9 @@ const apicache = require("apicache");
 const app = express();
 const cache = apicache.middleware;
 
+//this requires some version of cromium running on your system
+//if you are on computer just install chrome ez, but if you are on linux
+//you have to manually download a bunch of dependencies, you can look them up
 const puppeteer = require("puppeteer");
 
 if(process.env.PROD !='true'){
@@ -212,7 +215,7 @@ const generatePdfBuffer = async (htmlStr) => {
 
 const uploadPdf = async (buff, accessToken, title, spSiteName) => {
     const libName = 'Spr Reports';
-
+		console.log('OUR TARGET SITE ', spSiteName);
     const siteRes = await fetch(`https://graph.microsoft.com/v1.0/sites?search=${encodeURIComponent(spSiteName)}`, {
         method: "GET",
         headers: {
@@ -264,7 +267,7 @@ const uploadPdf = async (buff, accessToken, title, spSiteName) => {
 };
 
 
-const mkEmail = async (from, body, toAddress, siteId) => {
+const mkEmail = async (from, body, toAddress, siteId, ship) => {
     const getAccessToken = async () => {
         const params = new URLSearchParams();
         params.append("grant_type", "client_credentials");
@@ -292,7 +295,7 @@ const mkEmail = async (from, body, toAddress, siteId) => {
 
     const sendEmail = async (accessToken, fromUserEmail, toAddress, body, siteId) => {
         const attachmentBuffer = await generatePdfBuffer(body);
-        const title = `BMCC-SPR-${new Date().toISOString().slice(0, 10)}`
+        const title = `${ship}-SPR-${new Date().toISOString().slice(0, 10)}`
         //buff, accessToken, title, spSiteName
         const resp = await uploadPdf(attachmentBuffer, accessToken, title, siteId);
         console.log('pdf upload', resp)
@@ -311,15 +314,7 @@ const mkEmail = async (from, body, toAddress, siteId) => {
                     emailAddress: {
                         address: address,
                     },
-                })),
-                attachments: [
-                    {
-                        "@odata.type": "#microsoft.graph.fileAttachment",
-                        name: title,
-                        contentType: "application/pdf",
-                        contentBytes: base64Attachment,
-                    }
-                ],
+                }))
             },
             saveToSentItems: false,
         };
@@ -365,7 +360,8 @@ app.post("/testEmail", async (req, res) => {
     const body = req.body.body; // err here?
     const to = req.body.to;
     const siteId = req.body.site;
-    await mkEmail(from, body, to, siteId); // fire off email
+		const ship = req.body.ship
+    await mkEmail(from, body, to, siteId, ship); // fire off email
     res.send("haiii<br></br>sending you, sitedre email...");
 });
 
