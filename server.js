@@ -11,10 +11,10 @@ const cache = apicache.middleware;
 //you have to manually download a bunch of dependencies, you can look them up
 const puppeteer = require("puppeteer");
 
-if(process.env.PROD !='true'){
+if (process.env.PROD != 'true') {
 //we need this when running local dev env :p
-	const cors = require("cors");
-	app.use(cors())
+    const cors = require("cors");
+    app.use(cors())
 }
 
 //lets me pass extra stuff in posts
@@ -215,7 +215,7 @@ const generatePdfBuffer = async (htmlStr) => {
 
 const uploadPdf = async (buff, accessToken, title, spSiteName) => {
     const libName = 'Spr Reports';
-		console.log('OUR TARGET SITE ', spSiteName);
+    console.log('OUR TARGET SITE ', spSiteName);
     const siteRes = await fetch(`https://graph.microsoft.com/v1.0/sites?search=${encodeURIComponent(spSiteName)}`, {
         method: "GET",
         headers: {
@@ -296,7 +296,26 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
     const sendEmail = async (accessToken, fromUserEmail, toAddress, body, siteId) => {
         const attachmentBuffer = await generatePdfBuffer(body);
         const title = `${ship}-SPR-${new Date().toISOString().slice(0, 10)}`
-        //buff, accessToken, title, spSiteName
+
+        //mk from email
+        let actuallyFrom
+        switch (ship) {
+            case 'Gyre':
+                actuallyFrom = 'gyre@tdi-bi.com';
+                break;
+            case 'Brooks McCall':
+                actuallyFrom = 'bmcc@tdi-bi.com';
+                break;
+            case 'Proteus':
+                actuallyFrom = 'proteus@tdi-bi.com';
+                break;
+            case 'Nautilus':
+                actuallyFrom = 'nautilus@tdi-bi.com';
+                break;
+            default: // dev env
+                actuallyFrom = 'no-reply@tdi-bi.com';
+        }
+
         const resp = await uploadPdf(attachmentBuffer, accessToken, title, siteId);
         console.log('pdf upload', resp)
 
@@ -319,7 +338,7 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
             saveToSentItems: false,
         };
         const response = await fetch(
-            `https://graph.microsoft.com/v1.0/users/${fromUserEmail}/sendMail`,
+            `https://graph.microsoft.com/v1.0/users/${actuallyFrom}/sendMail`,
             {
                 method: "POST",
                 headers: {
@@ -360,9 +379,9 @@ app.post("/testEmail", async (req, res) => {
     const body = req.body.body; // err here?
     const to = req.body.to;
     const siteId = req.body.site;
-		const ship = req.body.ship
+    const ship = req.body.ship;
     await mkEmail(from, body, to, siteId, ship); // fire off email
-    res.send("haiii<br></br>sending you, sitedre email...");
+    res.send("haiii<br></br>sending your email...");
 });
 
 app.get("/testroute1", async (req, res) => {
