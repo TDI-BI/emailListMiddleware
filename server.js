@@ -293,28 +293,35 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
         return data.access_token;
     };
 
+    //setup stuff for email
+    let actuallyFrom // ship account
+    let master // master account to copy email to
+    switch (ship) {
+        case 'Gyre':
+            actuallyFrom = 'gyre@tdi-bi.com';
+            master = 'mastergyre@tdi-bi.com'
+            break;
+        case 'Brooks McCall':
+            actuallyFrom = 'bmcc@tdi-bi.com';
+            master = 'masterbmcc@tdi-bi.com'
+            break;
+        case 'Proteus':
+            actuallyFrom = 'proteus@tdi-bi.com';
+            master = 'masterproteus@tdi-bi.com'
+            break;
+        case 'Nautilus':
+            actuallyFrom = 'nautilus@tdi-bi.com';
+            master = 'masternautilus@tdi-bi.com'
+            break;
+        default: // dev env
+            actuallyFrom = 'no-reply@tdi-bi.com';
+            master = 'parkerseeley@tdi-bi.com'
+    }
+
     const sendEmail = async (accessToken, fromUserEmail, toAddress, body, siteId) => {
         const attachmentBuffer = await generatePdfBuffer(body);
         const title = `${ship}-SPR-${new Date().toISOString().slice(0, 10)}`
 
-        //mk from email
-        let actuallyFrom
-        switch (ship) {
-            case 'Gyre':
-                actuallyFrom = 'gyre@tdi-bi.com';
-                break;
-            case 'Brooks McCall':
-                actuallyFrom = 'bmcc@tdi-bi.com';
-                break;
-            case 'Proteus':
-                actuallyFrom = 'proteus@tdi-bi.com';
-                break;
-            case 'Nautilus':
-                actuallyFrom = 'nautilus@tdi-bi.com';
-                break;
-            default: // dev env
-                actuallyFrom = 'no-reply@tdi-bi.com';
-        }
 
         const resp = await uploadPdf(attachmentBuffer, accessToken, title, siteId);
         console.log('pdf upload', resp)
@@ -363,7 +370,7 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
         await sendEmail(
             token,
             from,
-            [toAddress],//, GROUPS WORK!
+            [toAddress, master],//, GROUPS WORK!
             body,
             siteId,
         );
