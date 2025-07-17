@@ -262,8 +262,7 @@ const uploadPdf = async (buff, accessToken, title, spSiteName) => {
         throw new Error(`Upload failed: ${uploadRes.status} ${error}`);
     }
 
-    const uploadedFile = await uploadRes.json();
-    return uploadedFile;
+    return await uploadRes.json();
 };
 
 
@@ -295,27 +294,27 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
 
     //setup stuff for email
     let actuallyFrom // ship account
-    let master // master account to copy email to
+    let extra // arr of extra emails because some want them to go to more people for some reason
     switch (ship) {
         case 'Gyre':
             actuallyFrom = 'gyre@tdi-bi.com';
-            master = 'mastergyre@tdi-bi.com'
+            extra = ['mastergyre@tdi-bi.com'];
             break;
         case 'Brooks McCall':
             actuallyFrom = 'bmcc@tdi-bi.com';
-            master = 'masterbmcc@tdi-bi.com'
+            extra = ['masterbmcc@tdi-bi.com'];
             break;
         case 'Proteus':
             actuallyFrom = 'proteus@tdi-bi.com';
-            master = 'masterproteus@tdi-bi.com'
+            extra = ['masterproteus@tdi-bi.com'];
             break;
         case 'Nautilus':
             actuallyFrom = 'nautilus@tdi-bi.com';
-            master = 'masternautilus@tdi-bi.com'
+            extra = ['masternautilus@tdi-bi.com', 'engineernautilus@tdi-bi.com'];
             break;
         default: // dev env
             actuallyFrom = 'no-reply@tdi-bi.com';
-            master = 'parkerseeley@tdi-bi.com'
+            extra = ['parkerseeley@tdi-bi.com'];
     }
 
     const sendEmail = async (accessToken, fromUserEmail, toAddress, body, siteId) => {
@@ -361,7 +360,6 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
             const error = await response.json();
             throw new Error(`Send mail failed: ${JSON.stringify(error)}`);
         }
-
         console.log("Email with PDF attachment sent successfully!");
     };
 
@@ -370,7 +368,7 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
         await sendEmail(
             token,
             from,
-            [toAddress, master],//, GROUPS WORK!
+            [toAddress].concat(extra),
             body,
             siteId,
         );
