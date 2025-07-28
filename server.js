@@ -339,7 +339,17 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
                     emailAddress: {
                         address: address,
                     },
-                }))
+                })),
+                /*
+                attachments: [
+                    {
+                        "@odata.type": "#microsoft.graph.fileAttachment",
+                        name: title,
+                        contentType: "application/pdf", 
+                        contentBytes: base64Attachment,
+                    },
+                ],
+                */
             },
             saveToSentItems: false,
         };
