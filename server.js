@@ -314,7 +314,11 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
       break;
     case "Nautilus":
       actuallyFrom = "nautilus@tdi-bi.com";
-      extra = ["masternautilus@tdi-bi.com", "engineernautilus@tdi-bi.com"];
+      extra = [
+        "masternautilus@tdi-bi.com",
+        "engineernautilus@tdi-bi.com",
+        "nautilus@tdi-bi.com",
+      ];
       break;
     default: // dev env
       actuallyFrom = "no-reply@tdi-bi.com";
