@@ -397,6 +397,8 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
 
 app.post("/testEmail", async (req, res) => {
   console.log("fewhhhh we are local :D");
+  const key = req.body.secretkey;
+  //  if (key !== process.env.TOP_SECRET_KEY) return; // make this an error catch at some point
   const from = req.body.from;
   const body = req.body.body; // err here?
   const to = req.body.to;
