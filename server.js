@@ -399,8 +399,8 @@ app.post("/testEmail", async (req, res) => {
   console.log("Starting email process...");
   const key = req.body.secretKey;
   if (key !== process.env.TOP_SECRET_KEY) {
-    throw new Error('Secret keys did not match, exiting');
-    return;
+    console.error('error: bad key :(')
+    return res.status(400).json({success:false,message:'invalid data provided'});
   } // make this an error catch at some point
   const from = req.body.from;
   const body = req.body.body; // err here?
