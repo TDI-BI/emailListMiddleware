@@ -78,6 +78,7 @@ const getGroups = async () => {
 };
 
 app.get("/", (req, res) => {
+  console.log('hi')
   res.send(
     "haiii<br>to see email groups use ./group<br>to see all groups use ./groups",
   );
@@ -396,17 +397,19 @@ const mkEmail = async (from, body, toAddress, siteId, ship) => {
 };
 
 app.post("/testEmail", async (req, res) => {
+  console.log('___________________________________________________________________________________-')
   console.log("Starting email process...");
   const key = req.body.secretKey;
   if (key !== process.env.TOP_SECRET_KEY) {
     console.error('error: bad key :(')
-    return res.status(400).json({success:false,message:'invalid data provided'});
+    return res.status(400).json({ success: false, message: 'invalid data provided' });
   } // make this an error catch at some point
   const from = req.body.from;
   const body = req.body.body; // err here?
   const to = req.body.to;
   const siteId = req.body.site;
   const ship = req.body.ship;
+  console.log(`writing for ${ship} @ ${(new Date()).toISOString()}`);
   await mkEmail(from, body, to, siteId, ship); // fire off email
   res.send("haiii<br></br>sending your email...");
 });
