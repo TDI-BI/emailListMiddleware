@@ -327,7 +327,7 @@ const uploadPdf = async (buff, accessToken, title, spSiteName) => {
         try {
             uploadData = JSON.parse(uploadText);
         } catch {
-            uploadData = { raw: uploadText };
+            uploadData = {raw: uploadText};
         }
 
         if (!uploadRes.ok) {
@@ -488,7 +488,7 @@ app.post("/testEmail", async (req, res) => {
         if (!from || !body || !to || !site || !ship) {
             return res.status(400).json({
                 success: false,
-                message: "Missing required parameters (from, body, to, site, ship)",
+                message: `Missing required parameters - ${!from ? 'from, ' : ''}${!body ? 'body, ' : ''}${!to ? 'to, ' : ''}${!site ? 'site, ' : ''}${!ship ? 'ship' : ''}`,
             });
         }
 
@@ -505,7 +505,7 @@ app.post("/testEmail", async (req, res) => {
         console.error("Error during email send:", err);
         return res.status(500).json({
             success: false,
-            message: "Internal error while sending email.",
+            message: "Internal error while sending email - contact IT",
             error: err.message,
         });
     }
