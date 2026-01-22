@@ -22,11 +22,14 @@ router.get('/', (req, res) => {
 
 // Healthcheck
 router.get('/healthcheck', (req, res) => {
+  res.send('online');
+  /*
   res.json({
     status: 'ok',
     env: process.env.PROD === 'true' ? 'production' : 'development',
     time: new Date().toISOString(),
   });
+   */
 });
 
 module.exports = router;
