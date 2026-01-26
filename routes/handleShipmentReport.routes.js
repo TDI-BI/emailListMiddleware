@@ -227,6 +227,8 @@ const mkShipmentReportHtml = shipmentItems => {
  */
 router.get('/mkShipmentReport', async (req, res) => {
   try {
+    if (process.env.PROD === true && pass !== process.env.TOP_SECRET_KEY)
+      throw new Error('Unauthorized');
     // Token
     const accessToken = await getAccessToken365();
 
@@ -241,7 +243,7 @@ router.get('/mkShipmentReport', async (req, res) => {
 
     // Email
     const fromEmail = 'no-reply@tdi-bi.com';
-    const toEmail = ['parkerseeley@tdi-bi.com'];
+    const toEmail = ['parkerseeley@tdi-bi.com', 'nicreynolds@tdi-bi.com'];
     const subject = `Weekly Shipment Report - ${new Date().toLocaleDateString(
       'en-US',
       {
