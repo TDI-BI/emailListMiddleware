@@ -25,9 +25,10 @@ app.use('/', require('./routes/getGroupById.routes'));
 app.use('/', require('./routes/getGroupByName.routes'));
 app.use('/', require('./routes/getSelectedGroups.routes'));
 
-// REPORT / SHAREPOINT ROUTES
+// SHAREPOINT ROUTES
 app.use('/', require('./routes/handleSprReport.routes'));
 app.use('/', require('./routes/handleShipmentReport.routes'));
+app.use('/', require('./routes/getPosition.routes'));
 
 //error handler
 app.use((err, req, res, next) => {
