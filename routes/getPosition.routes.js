@@ -12,11 +12,12 @@ const { getAccessToken365 } = require('../utils/getTokens');
  */
 const fetchPositionRecords = async (accessToken, site, daysBack = 7) => {
   try {
+    // SharePoint site and list info
     const siteUrl = 'tdibrooks.sharepoint.com';
     const sitePath = `/sites/${site}`;
     const listName = 'Positions';
 
-    // Get site ID
+    // Get site ID first
     const siteResponse = await fetch(
       `https://graph.microsoft.com/v1.0/sites/${siteUrl}:${sitePath}`,
       {
@@ -33,10 +34,12 @@ const fetchPositionRecords = async (accessToken, site, daysBack = 7) => {
 
     const siteData = await siteResponse.json();
     const siteId = siteData.id;
-
-    // Get list items sorted newest → oldest, limit 1000
+    console.log(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items?$expand=fields&$orderby=fields/Date desc&$top=${daysBack * 25}`
+    );
+    // Get list items sorted newest → oldest, limit based on days
     const listResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items?$expand=fields&$orderby=fields/Date desc&?top=${daysBack * 25}`,
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items?$expand=fields&$orderby=fields/Date desc&$top=${daysBack * 25}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -49,16 +52,15 @@ const fetchPositionRecords = async (accessToken, site, daysBack = 7) => {
       throw new Error(`Failed to get list items: ${listResponse.statusText}`);
     }
 
-    const listJson = await listResponse.json();
-    const listData = listJson.value;
+    const listData = await listResponse.json();
 
     // Calculate cutoff date
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
     cutoffDate.setHours(0, 0, 0, 0);
 
-    // Map and filter by date
-    const positionRecords = listData
+    // Map SharePoint fields to our expected format and filter by date
+    const positionRecords = listData.value
       .map(item => ({
         Latitude: item.fields.Latitude || null,
         Longitude: item.fields.Longitude || null,
@@ -69,7 +71,7 @@ const fetchPositionRecords = async (accessToken, site, daysBack = 7) => {
         const recordDate = new Date(record.Date);
         return recordDate >= cutoffDate;
       })
-      .sort((a, b) => new Date(a.Date) - new Date(b.Date)); // Sort ascending (oldest to newest)
+      .sort((a, b) => new Date(a.Date) - new Date(b.Date)); // Sort by date ascending
 
     return positionRecords;
   } catch (error) {
