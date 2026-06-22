@@ -30,6 +30,9 @@ app.use('/', require('./routes/handleSprReport.routes'));
 app.use('/', require('./routes/handleShipmentReport.routes'));
 app.use('/', require('./routes/getPosition.routes'));
 
+// SMARTSHEET ROUTES
+app.use('/', require('./routes/getSheet.routes'));
+
 //error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
