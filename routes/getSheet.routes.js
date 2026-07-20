@@ -2,11 +2,38 @@ const express = require('express');
 const router = express.Router();
 
 const VESSEL_MAP = {
-  'Brooks McCall': 'BMCC',
-  'Emma McCall': 'EMMA',
+    'Brooks McCall': 'BMCC',
+    'Emma McCall': 'EMMA',
 };
 
-const SHEET_ID = 'gCC5PV5qGg66HjPcqWxGxCfrWxHX53QjC3wwH9J1';
+const SHEET_ID = 'gCC5PV5qGg66HjPcqWxGxCfrWxHX53QjC3wwH9J1'; // cant imagine we need to .env this
+
+// Fine-grained "Project Stage" values -> general status bucket shown via this API.
+// Anything not listed here is considered a lost project and is excluded from the response.
+const STATUS_MAP = {
+    'Discovery': 'Proposal',
+    'Request for Info': 'Proposal',
+    'Budgetary Pricing': 'Proposal',
+    'Proposal in Progress': 'Proposal',
+    'Proposal Submitted': 'Proposal',
+
+    'Anticipated Award': 'Planning',
+    'Awarded': 'Planning',
+    'Planning': 'Planning',
+
+    'Transit': 'In Progress',
+    'Vessel in Field': 'In Progress',
+    'Process and Reporting': 'In Progress',
+    'Draft Submitted': 'In Progress',
+    'Final Submitted': 'In Progress',
+
+    'Complete': 'Complete',
+
+    'On Hold': 'Pause',
+    'Maintenance/Dock': 'Pause',
+};
+
+const normalizeStage = (value) => (value || '').toString().trim().replace(/\s+/g, ' ');
 
 /**
  * GET /getSheet
@@ -18,76 +45,81 @@ const SHEET_ID = 'gCC5PV5qGg66HjPcqWxGxCfrWxHX53QjC3wwH9J1';
  */
 
 router.get('/getSheet', async (req, res) => {
-  try {
-    const { inVessel, windowStart, windowEnd } = req.query;
+    try {
+        const {inVessel, windowStart, windowEnd} = req.query;
 
-    const vesselFilter = VESSEL_MAP[inVessel] ?? inVessel;
+        const vesselFilter = VESSEL_MAP[inVessel] ?? inVessel;
 
-    const query = new URLSearchParams({
-      accessApiLevel: '0',
-      level: '0',
-    }).toString();
+        const query = new URLSearchParams({
+            accessApiLevel: '0',
+            level: '0',
+        }).toString();
 
-    const resp = await fetch(
-      `https://api.smartsheet.com/2.0/sheets/${SHEET_ID}?${query}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${process.env.SS_TOK}`,
-          'smartsheet-integration-source': 'AI,SampleOrg,My-AI-Connector-v2',
-          Accept: 'string',
-        },
-      }
-    );
+        const resp = await fetch(
+            `https://api.smartsheet.com/2.0/sheets/${SHEET_ID}?${query}`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${process.env.SS_TOK}`,
+                    'smartsheet-integration-source': 'AI,SampleOrg,My-AI-Connector-v2',
+                    Accept: 'string',
+                },
+            }
+        );
 
-    if (!resp.ok) {
-      throw new Error(`Smartsheet API error: ${resp.status} ${resp.statusText}`);
+        if (!resp.ok) {
+            throw new Error(`Smartsheet API error: ${resp.status} ${resp.statusText}`);
+        }
+
+        const data = await resp.json();
+        const cols = data.columns;
+        const idx = (title) => cols.findIndex((col) => col.title === title);
+
+        const proposedVessel = idx('Proposed Vessel');
+        const anticipatedStart = idx('Anticipated Start Date (Calendar)');
+        const anticipatedEnd = idx('Anticipated End Date');
+        const actualVessel = idx('Actual Vessel');
+        const actualStart = idx('Start Date');
+        const actualEnd = idx('Survey End Date');
+        const region = idx('Region');
+        const location = idx('Project Location');
+        const client = idx('Client');
+        const projectName = idx('Project Name');
+        const projectStage = idx('Project Stage');
+
+        const cells = data.rows
+            .map((item) => {
+                const c = item.cells;
+
+                const vessel = c[actualVessel]?.value || c[proposedVessel]?.value;
+                const startDate = c[actualStart]?.value || c[anticipatedStart]?.value;
+                const endDate = c[actualEnd]?.value || c[anticipatedEnd]?.value;
+                const status = STATUS_MAP[normalizeStage(c[projectStage]?.value)];
+
+                if (!vessel || !startDate || !endDate) return null;
+                if (!status) return null; // not in our mapping - treat as a lost project
+                if (vesselFilter && vessel !== vesselFilter) return null;
+                if (windowStart && new Date(endDate) < new Date(windowStart)) return null;
+                if (windowEnd && new Date(startDate) > new Date(windowEnd)) return null;
+
+                return {
+                    title: `${c[client]?.value} - ${c[projectName]?.value}`,
+                    titleDetailed: `${c[client]?.value} - ${c[projectName]?.value} (${c[region]?.value}, ${c[location]?.value})`,
+                    startDate,
+                    endDate,
+                    vessel,
+                    isProposal: !c[actualVessel]?.value,
+                    status,
+                    projStage: c[projectStage]?.value
+                };
+            })
+            .filter(Boolean);
+
+        res.json(cells);
+    } catch (err) {
+        console.error('Error in getSheet:', err);
+        res.status(500).json({msg: 'there is an error', err: err.message});
     }
-
-    const data = await resp.json();
-    const cols = data.columns;
-    const idx = (title) => cols.findIndex((col) => col.title === title);
-
-    const proposedVessel  = idx('Proposed Vessel');
-    const anticipatedStart = idx('Anticipated Start Date (Calendar)');
-    const anticipatedEnd  = idx('Anticipated End Date');
-    const actualVessel    = idx('Actual Vessel');
-    const actualStart     = idx('Start Date');
-    const actualEnd       = idx('Survey End Date');
-    const region          = idx('Region');
-    const location        = idx('Project Location');
-    const client          = idx('Client');
-    const projectName     = idx('Project Name');
-
-    const cells = data.rows
-      .map((item) => {
-        const c = item.cells;
-
-        const vessel    = c[actualVessel]?.value  || c[proposedVessel]?.value;
-        const startDate = c[actualStart]?.value   || c[anticipatedStart]?.value;
-        const endDate   = c[actualEnd]?.value     || c[anticipatedEnd]?.value;
-
-        if (!vessel || !startDate || !endDate) return null;
-        if (vesselFilter && vessel !== vesselFilter) return null;
-        if (windowStart && new Date(endDate)   < new Date(windowStart)) return null;
-        if (windowEnd   && new Date(startDate) > new Date(windowEnd))   return null;
-
-        return {
-          title:         `${c[client]?.value} - ${c[projectName]?.value}`,
-          titleDetailed: `${c[client]?.value} - ${c[projectName]?.value} (${c[region]?.value}, ${c[location]?.value})`,
-          startDate,
-          endDate,
-          vessel,
-          isProposal: !c[actualVessel]?.value,
-        };
-      })
-      .filter(Boolean);
-
-    res.json(cells);
-  } catch (err) {
-    console.error('Error in getSheet:', err);
-    res.status(500).json({ msg: 'there is an error', err: err.message });
-  }
 });
 
 module.exports = router;

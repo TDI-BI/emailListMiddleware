@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "report-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "/private/tmp/claude-501/-Users-eygwa-webDev-emailListMiddleware/ee36ed24-89d1-4c50-96e4-14cf3733bf23/scratchpad/preview", "-p", "4173", "-c-1"],
+      "port": 4173
+    }
+  ]
+}
