@@ -2,7 +2,7 @@ const express = require('express');
 //const fetch = require('node-fetch'); // only needed if you're not on Node 18+ with global fetch
 const router = express.Router();
 
-const {getAccessToken365} = require('../utils/getTokens');
+const {getAccessTokenTdiApi} = require('../utils/getTokens');
 const {mkPdfBuffer} = require('../utils/mkPdfBuffer');
 const {sendEmail} = require('../utils/sendEmail');
 
@@ -137,7 +137,7 @@ const uploadPdf = async (buff, accessToken, title, siteName) => {
  */
 const handleSprDistribution = async (htmlBody, toAddress, siteId, vessel) => {
     // Token
-    const accessToken = await getAccessToken365();
+    const accessToken = await getAccessTokenTdiApi();
 
     // PDF
     const pdfBuffer = await mkPdfBuffer(htmlBody);

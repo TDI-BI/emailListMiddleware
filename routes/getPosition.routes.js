@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { getAccessToken365 } = require('../utils/getTokens');
+const { getAccessTokenTdiApi } = require('../utils/getTokens');
 
 /**
  * Fetch position records from SharePoint list
@@ -108,7 +108,7 @@ router.get('/getPositions', async (req, res) => {
     }
 
     // Get access token
-    const accessToken = await getAccessToken365();
+    const accessToken = await getAccessTokenTdiApi();
 
     // Fetch position records
     const positionRecords = await fetchPositionRecords(
@@ -152,7 +152,7 @@ router.get('/getPosition', async (req, res) => {
     }
 
     // Get access token
-    const accessToken = await getAccessToken365();
+    const accessToken = await getAccessTokenTdiApi();
 
     // Fetch position records (just last day to get most recent)
     const positionRecords = await fetchPositionRecords(accessToken, site, 1);

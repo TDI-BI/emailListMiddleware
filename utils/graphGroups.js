@@ -1,8 +1,8 @@
 const axios = require('axios');
-const { getAccessTokenLists } = require('./getTokens');
+const { getAccessTokenCmApi } = require('./getTokens');
 
 const getGroups = async () => {
-  const token = await getAccessTokenLists();
+  const token = await getAccessTokenCmApi();
   const res = await axios.get(`${process.env.GRAPH_API_URL}/groups`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -10,7 +10,7 @@ const getGroups = async () => {
 };
 
 const getGroupMembers = async groupId => {
-  const token = await getAccessTokenLists();
+  const token = await getAccessTokenCmApi();
   const res = await axios.get(
     `${process.env.GRAPH_API_URL}/groups/${groupId}/members`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -19,7 +19,7 @@ const getGroupMembers = async groupId => {
 };
 
 const getGroupByName = async name => {
-  const token = await getAccessTokenLists();
+  const token = await getAccessTokenCmApi();
 
   const groupRes = await axios.get(
     `${process.env.GRAPH_API_URL}/groups?$filter=mail eq '${name}@tdi-bi.com'`,

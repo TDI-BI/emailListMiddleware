@@ -1,170 +1,170 @@
-const express = require('express');
-const {getAccessToken365} = require("../utils/getTokens");
-const {sendEmail} = require("../utils/sendEmail");
+const express = require("express");
+const { getAccessTokenTdiApi } = require("../utils/getTokens");
+const { sendEmail } = require("../utils/sendEmail");
 const router = express.Router();
 
-router.get('/dailyTaskRefresh', async (req, res) => {
+router.get("/dailyTaskRefresh", async (req, res) => {
+  const siteUrl = "tdibrooks.sharepoint.com";
+  const sitePath = "/sites/Marine";
+  const listName = "Scheduled Task";
 
+  const accessToken = await getAccessTokenTdiApi();
 
-    const siteUrl = 'tdibrooks.sharepoint.com';
-    const sitePath = '/sites/Marine';
-    const listName = "Scheduled Task"
+  const siteResponse = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteUrl}:${sitePath}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
 
-    const accessToken = await getAccessToken365();
+  const siteData = await siteResponse.json();
+  const siteId = siteData.id;
 
+  const today = new Date();
 
-    const siteResponse = await fetch(
-        `https://graph.microsoft.com/v1.0/sites/${siteUrl}:${sitePath}`,
-        {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-        }
-    );
+  const startOfToday = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+  );
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
 
-    const siteData = await siteResponse.json();
-    const siteId = siteData.id;
+  const endDateFilter = `fields/EndDate ge '${startOfToday.toISOString()}' and fields/EndDate lt '${startOfTomorrow.toISOString()}'`;
 
-    const today = new Date();
+  const TasksListFromSharepoint = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items?$expand=fields&$filter=${encodeURIComponent(endDateFilter)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly",
+      },
+    },
+  );
+  const ScheduledTasksRaw = await TasksListFromSharepoint.json();
+  const ScheduledTasks = ScheduledTasksRaw.value.map((e) => e.fields); // these are tasks that ended today
 
-    const startOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+  const TaskClassesFromSharepoint = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/Task Class/items?expand=fields`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  const TaskClassesRaw = await TaskClassesFromSharepoint.json();
+  const TaskClasses = TaskClassesRaw.value.map((e) => e.fields); // just a list of classes, this one is pretty short so no need to do a fancy query
 
-    const endDateFilter = `fields/EndDate ge '${startOfToday.toISOString()}' and fields/EndDate lt '${startOfTomorrow.toISOString()}'`;
+  //lookup from ScheduledTask.ClassId -> TaskClasses.Years, TaskClasses.Month, TaskClasses.Id
+  const classById = new Map(TaskClasses.map((c) => [String(c.id), c]));
 
-    const TasksListFromSharepoint = await fetch(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items?$expand=fields&$filter=${encodeURIComponent(endDateFilter)}`,
-        {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly',
-            },
-        }
-    );
-    const ScheduledTasksRaw = await TasksListFromSharepoint.json();
-    const ScheduledTasks = ScheduledTasksRaw.value.map(e => e.fields); // these are tasks that ended today
+  const addYearsMonths = (date, years, months) => {
+    const result = new Date(date);
+    result.setUTCFullYear(result.getUTCFullYear() + years);
+    result.setUTCMonth(result.getUTCMonth() + months);
+    return result;
+  };
 
-    const TaskClassesFromSharepoint = await fetch(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/Task Class/items?expand=fields`,
-        {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-        }
-    );
-    const TaskClassesRaw = await TaskClassesFromSharepoint.json();
-    const TaskClasses = TaskClassesRaw.value.map(e => e.fields) // just a list of classes, this one is pretty short so no need to do a fancy query
+  const refreshedTasks = ScheduledTasks.map((scheduledTask) => {
+    const taskClass = classById.get(String(scheduledTask.ClassLookupId));
+    const years = taskClass?.Years ?? 0;
+    const months = taskClass?.Months ?? 0;
 
-    //lookup from ScheduledTask.ClassId -> TaskClasses.Years, TaskClasses.Month, TaskClasses.Id
-    const classById = new Map(TaskClasses.map((c) => [String(c.id), c]));
+    if (years === 0 && months === 0) return null;
 
-    const addYearsMonths = (date, years, months) => {
-        const result = new Date(date);
-        result.setUTCFullYear(result.getUTCFullYear() + years);
-        result.setUTCMonth(result.getUTCMonth() + months);
-        return result;
+    const prevStartDate = new Date(scheduledTask.StartDate);
+    const prevEndDate = new Date(scheduledTask.EndDate);
+    const prevDuration = prevEndDate - prevStartDate;
+
+    const startDate = addYearsMonths(prevEndDate, years, months);
+    const endDate = new Date(startDate.getTime() + prevDuration);
+
+    return {
+      ClassId: taskClass.id,
+      LocationId: scheduledTask.LocationLookupId,
+      StartDate: startDate.toISOString(),
+      EndDate: endDate.toISOString(),
+      Status: "Automatically Scheduled",
     };
+  }).filter(Boolean);
 
-    const refreshedTasks = ScheduledTasks
-        .map((scheduledTask) => {
-            const taskClass = classById.get(String(scheduledTask.ClassLookupId));
-            const years = taskClass?.Years ?? 0;
-            const months = taskClass?.Months ?? 0;
+  const createdTasks = [];
+  const failedTasks = [];
 
-            if (years === 0 && months === 0) return null;
+  for (const task of refreshedTasks) {
+    try {
+      const createResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fields: {
+              ClassLookupId: task.ClassId,
+              LocationLookupId: task.LocationId,
+              StartDate: task.StartDate,
+              EndDate: task.EndDate,
+              Status: task.Status,
+            },
+          }),
+        },
+      );
 
-            const prevStartDate = new Date(scheduledTask.StartDate);
-            const prevEndDate = new Date(scheduledTask.EndDate);
-            const prevDuration = prevEndDate - prevStartDate;
+      if (!createResponse.ok) {
+        const errorBody = await createResponse.json().catch(() => ({}));
+        throw new Error(
+          `${createResponse.status}: ${JSON.stringify(errorBody)}`,
+        );
+      }
 
-            const startDate = addYearsMonths(prevEndDate, years, months);
-            const endDate = new Date(startDate.getTime() + prevDuration);
-
-            return {
-                ClassId: taskClass.id,
-                LocationId: scheduledTask.LocationLookupId,
-                StartDate: startDate.toISOString(),
-                EndDate: endDate.toISOString(),
-                Status: 'Automatically Scheduled'
-            };
-        })
-        .filter(Boolean);
-
-    const createdTasks = [];
-    const failedTasks = [];
-
-    for (const task of refreshedTasks) {
-        try {
-            const createResponse = await fetch(
-                `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items`,
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fields: {
-                            ClassLookupId: task.ClassId,
-                            LocationLookupId: task.LocationId,
-                            StartDate: task.StartDate,
-                            EndDate: task.EndDate,
-                            Status: task.Status,
-                        },
-                    }),
-                }
-            );
-
-            if (!createResponse.ok) {
-                const errorBody = await createResponse.json().catch(() => ({}));
-                throw new Error(`${createResponse.status}: ${JSON.stringify(errorBody)}`);
-            }
-
-            createdTasks.push(await createResponse.json());
-        } catch (err) {
-            failedTasks.push({task, error: err.message});
-        }
+      createdTasks.push(await createResponse.json());
+    } catch (err) {
+      failedTasks.push({ task, error: err.message });
     }
+  }
 
-    const completedTasks = [];
-    const failedCompletions = [];
+  const completedTasks = [];
+  const failedCompletions = [];
 
-    for (const scheduledTask of ScheduledTasks) {
-        try {
-            const completeResponse = await fetch(
-                `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items/${scheduledTask.id}/fields`,
-                {
-                    method: 'PATCH',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({Status: 'Complete'}),
-                }
-            );
+  for (const scheduledTask of ScheduledTasks) {
+    try {
+      const completeResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listName}/items/${scheduledTask.id}/fields`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ Status: "Complete" }),
+        },
+      );
 
-            if (!completeResponse.ok) {
-                const errorBody = await completeResponse.json().catch(() => ({}));
-                throw new Error(`${completeResponse.status}: ${JSON.stringify(errorBody)}`);
-            }
+      if (!completeResponse.ok) {
+        const errorBody = await completeResponse.json().catch(() => ({}));
+        throw new Error(
+          `${completeResponse.status}: ${JSON.stringify(errorBody)}`,
+        );
+      }
 
-            completedTasks.push({id: scheduledTask.id});
-        } catch (err) {
-            failedCompletions.push({id: scheduledTask.id, error: err.message});
-        }
+      completedTasks.push({ id: scheduledTask.id });
+    } catch (err) {
+      failedCompletions.push({ id: scheduledTask.id, error: err.message });
     }
+  }
 
-    res.status(200).json({
-        created: createdTasks,
-        failedCreations: failedTasks,
-        completed: completedTasks,
-        failedCompletions,
-    });
-
+  res.status(200).json({
+    created: createdTasks,
+    failedCreations: failedTasks,
+    completed: completedTasks,
+    failedCompletions,
+  });
 });
 
 module.exports = router;
