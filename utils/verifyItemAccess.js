@@ -10,6 +10,11 @@ const { getListItems } = require("./getItemsByIds");
 //     itemId,                         // the item id the caller wants data for
 //     personColumn: "Person",         // PersonOrGroup column on the join list
 //     userId,                         // internal site user id (from getSiteUserId)
+//     publicWhen: {                    // optional: skip the ownership check entirely when the
+//       list: "Asset",                //   target item itself is flagged public
+//       field: "ClassificationLevel",
+//       value: "Public",
+//     },
 //   })
 //
 // Active = the row's EndDate is null. We filter server-side on the person LookupId (queryable)
@@ -23,14 +28,31 @@ const verifyItemAccess = async ({
   itemId,
   personColumn,
   userId,
+  publicWhen,
 }) => {
-  if (!listName || !itemColumn || !itemId || !personColumn || !userId) {
-    return false;
-  }
-
-  const itemLookupField = `${itemColumn}LookupId`;
+  if (!itemId) return false;
 
   try {
+    // Public items are unprotected — no assignment required.
+    if (publicWhen?.list && publicWhen?.field) {
+      const response = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${publicWhen.list}/items/${itemId}?$expand=fields($select=${publicWhen.field})`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.fields?.[publicWhen.field] === publicWhen.value) return true;
+      }
+    }
+
+    if (!listName || !itemColumn || !personColumn || !userId) return false;
+
+    const itemLookupField = `${itemColumn}LookupId`;
     const rows = await getListItems({
       token,
       siteId,
@@ -39,8 +61,6 @@ const verifyItemAccess = async ({
       filter: `fields/${personColumn}LookupId eq ${userId} and fields/EndDate eq null`,
     });
 
-    //stacking 3 filters is probably better, then just ensuring len>=0? something to ponder.
-    //additionally maybe at some point i should see if the item is public
     return rows.some(
       (fields) => String(fields[itemLookupField]) === String(itemId),
     );

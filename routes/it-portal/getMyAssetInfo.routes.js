@@ -89,7 +89,7 @@ router.post("/it-portal/getMyAssetInfo", requireAuth, async (req, res) => {
         listName: `${classification}Detail`,
         filter: `fields/AssetLookupId eq ${assetId}`,
       });
-      console.log(detailRows);
+      //console.log(detailRows);
       details = detailRows[0] ? stripMetadata(detailRows[0]) : null;
     }
 
