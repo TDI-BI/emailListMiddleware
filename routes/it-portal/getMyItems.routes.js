@@ -42,7 +42,7 @@ router.post("/it-portal/getMyItems", requireAuth, async (req, res) => {
       listName: "Asset",
       ids: assetTags,
       field: "Tag",
-      select: ["Tag", "Model", "SerialNumber", "ClassificationLevel"],
+      select: ["Id", "Tag", "Model", "SerialNumber", "ClassificationLevel"],
     });
     const assetById = new Map(assetItems.map((fields) => [fields.Tag, fields]));
 
@@ -73,8 +73,6 @@ router.post("/it-portal/getMyItems", requireAuth, async (req, res) => {
         startDate: assignment.StartDate,
       };
     });
-
-    console.log(items);
 
     return res.json({ upn: username, items });
   } catch (err) {

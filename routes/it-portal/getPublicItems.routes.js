@@ -23,7 +23,7 @@ router.post("/it-portal/getPublicItems", requireAuth, async (req, res) => {
       token: accessToken,
       siteId,
       listName: "Asset",
-      select: ["Tag", "Model", "SerialNumber", "ClassificationLevel"],
+      select: ["Id", "Tag", "Model", "SerialNumber", "ClassificationLevel"],
       filter: `fields/ClassificationLevel eq 'Public'`,
     });
 
@@ -49,8 +49,6 @@ router.post("/it-portal/getPublicItems", requireAuth, async (req, res) => {
       asset,
       model: modelByTitle.get(asset.Model) ?? null,
     }));
-
-    console.log(items);
 
     return res.json({ upn: username, items });
   } catch (err) {
