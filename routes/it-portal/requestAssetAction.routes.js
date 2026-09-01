@@ -57,7 +57,7 @@ router.post("/it-portal/requestAssetAction", requireAuth, async (req, res) => {
     const openedBy = req.user.upn;
 
     const createResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/ActionRequests/items`,
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/ActionRequest/items`,
       {
         method: "POST",
         headers: {
@@ -79,7 +79,7 @@ router.post("/it-portal/requestAssetAction", requireAuth, async (req, res) => {
     if (!createResponse.ok) {
       const errorBody = await createResponse.json().catch(() => ({}));
       console.error(
-        "ActionRequests create failed:",
+        "ActionRequest create failed:",
         createResponse.status,
         errorBody,
       );
