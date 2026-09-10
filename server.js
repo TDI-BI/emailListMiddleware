@@ -43,6 +43,8 @@ app.use("/", require("./routes/it-portal/getAssetActions.routes"));
 app.use("/", require("./routes/it-portal/getMyAssetInfo.routes"));
 app.use("/", require("./routes/it-portal/getFileLinks.routes"));
 app.use("/", require("./routes/it-portal/requestAssetAction.routes"));
+app.use("/", require("./routes/it-portal/testMyEmployees.routes"));
+app.use("/", require("./routes/it-portal/getEmployeeItems.routes"));
 
 //error handler
 app.use((err, req, res, next) => {
