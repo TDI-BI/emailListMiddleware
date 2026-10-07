@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { mkPdfBuffer } = require('../utils/mkPdfBuffer');
 const { sendEmail } = require('../utils/sendEmail');
-const { getAccessToken365 } = require('../utils/getTokens');
+const { getAccessTokenTdiApi } = require('../utils/getTokens');
 
 /**
  * Fetch shipment records from SharePoint list
@@ -230,7 +230,7 @@ router.get('/mkShipmentReport', async (req, res) => {
     if (process.env.PROD === true && pass !== process.env.TOP_SECRET_KEY)
       throw new Error('Unauthorized');
     // Token
-    const accessToken = await getAccessToken365();
+    const accessToken = await getAccessTokenTdiApi();
 
     // Get data
     const shipmentRecords = await fetchShipmentRecords(accessToken);

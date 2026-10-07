@@ -1,5 +1,5 @@
 const express = require('express');
-const {getAccessToken365} = require("../utils/getTokens");
+const {getAccessTokenTdiApi} = require("../utils/getTokens");
 const {sendEmail} = require("../utils/sendEmail");
 const router = express.Router();
 
@@ -10,7 +10,7 @@ router.get('/weeklyTaskReport', async (req, res) => {
     const sitePath = '/sites/Marine';
     const listName = "Scheduled Task"
 
-    const accessToken = await getAccessToken365();
+    const accessToken = await getAccessTokenTdiApi();
 
 
     const siteResponse = await fetch(

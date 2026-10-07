@@ -2,7 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const router = express.Router();
 
-const { getAccessTokenLists } = require("../utils/getTokens");
+const { getAccessTokenCmApi } = require("../utils/getTokens");
 
 router.get("/getGroupByName", async (req, res) => {
     try {
@@ -14,7 +14,7 @@ router.get("/getGroupByName", async (req, res) => {
             });
         }
 
-        const token = await getAccessTokenLists();
+        const token = await getAccessTokenCmApi();
         if (!token) {
             return res.status(500).json({
                 error: "Failed to acquire access token",
