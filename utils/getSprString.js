@@ -38,6 +38,14 @@ const emptyDash = (color = MUTED_LIGHT) =>
 
 const orDash = (value) => (value ? escapeHtml(value) : emptyDash());
 
+// Report data is client-supplied, so tolerate missing/null fields instead of throwing.
+const text = (value) => String(value ?? '').trim();
+const obj = (value) => (value && typeof value === 'object' ? value : {});
+const rows = (value) => (Array.isArray(value) ? value.filter((row) => row && typeof row === 'object') : []);
+
+const cleanRecipients = (list) =>
+  (Array.isArray(list) ? list : []).map(text).filter(Boolean);
+
 const formatDateShort = (iso) =>
   new Date(iso).toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
 
@@ -138,31 +146,40 @@ const resourceRow = ({label, start, received, consumed, left, borderless}) => `
     <td style="${css({padding: '11px 14px', textAlign: 'right', boxSizing: 'border-box', fontFamily: MONO, fontSize: '12.5px', fontWeight: 600, color: INK, overflowWrap: 'break-word'})}">${left}</td>
   </tr>`;
 
-const remaining = (start, received, consumed) =>
-  String(Number(start) + (Number(received) || 0) - (Number(consumed) || 0));
+const remaining = (start, received, consumed) => {
+  if (text(start) === '' || Number.isNaN(Number(start))) return emptyDash();
+  return String(Number(start) + (Number(received) || 0) - (Number(consumed) || 0));
+};
 
-const getSprString = ({
-  reportDate,
-  notificationList = [],
-  originalOnboard = [],
-  crewSafety: {onboardRows = [], movementRows = []} = {},
-  general: {certsAuditsRows = [], logbookRows = [], miscStatusRows = []} = {},
-  voyage: {currentVoyages = [], currentPosition = null} = {},
-  machinery: {enginesState = {}, generatorsState = {}} = {},
-  environmentResources: {windWavesState = {}, resourcesState = {}} = {},
-  siteConfig: {generatorNames = {}, thrusterMode = false} = {},
-}, vesselName) => {
-  const recipients = notificationList.map((email) => email.trim()).filter(Boolean);
+const getSprString = (reportData, vesselName) => {
+  const report = obj(reportData);
+  const {reportDate} = report;
+  const originalOnboard = rows(report.originalOnboard);
+  const onboardRows = rows(obj(report.crewSafety).onboardRows);
+  const movementRows = rows(obj(report.crewSafety).movementRows);
+  const certsAuditsRows = rows(obj(report.general).certsAuditsRows);
+  const logbookRows = rows(obj(report.general).logbookRows);
+  const miscStatusRows = rows(obj(report.general).miscStatusRows);
+  const currentVoyages = rows(obj(report.voyage).currentVoyages);
+  const currentPosition = obj(report.voyage).currentPosition ?? null;
+  const enginesState = obj(obj(report.machinery).enginesState);
+  const generatorsState = obj(obj(report.machinery).generatorsState);
+  const windWavesState = obj(obj(report.environmentResources).windWavesState);
+  const resourcesState = obj(obj(report.environmentResources).resourcesState);
+  const generatorNames = obj(obj(report.siteConfig).generatorNames);
+  const thrusterMode = Boolean(obj(report.siteConfig).thrusterMode);
+
+  const recipients = cleanRecipients(report.notificationList);
 
   const mastheadDate = new Date(`${reportDate}T00:00:00`).toLocaleDateString(undefined, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
   const signedOnNames = new Set(
-    movementRows.filter((m) => m.Typeof === 'sign on').map((m) => m.Name.trim().toLowerCase())
+    movementRows.filter((m) => m.Typeof === 'sign on').map((m) => text(m.Name).toLowerCase())
   );
-  const activeOnboard = onboardRows.filter((row) => row.Name.trim());
-  const signedOff = movementRows.filter((m) => m.Typeof === 'sign off' && m.Name.trim());
+  const activeOnboard = onboardRows.filter((row) => text(row.Name));
+  const signedOff = movementRows.filter((m) => m.Typeof === 'sign off' && text(m.Name));
 
   const allGenerators = [
     [generatorNames.GeneratorOne, generatorsState.GeneratorOne],
@@ -170,18 +187,18 @@ const getSprString = ({
     [generatorNames.GeneratorThree, generatorsState.GeneratorThree],
     [generatorNames.GeneratorFour, generatorsState.GeneratorFour],
   ];
-  const namedGenerators = allGenerators.filter(([name]) => (name || '').trim());
+  const namedGenerators = allGenerators.filter(([name]) => text(name));
 
   const statusGroups = [];
-  miscStatusRows.filter((row) => row.description.trim()).forEach((row) => {
-    const key = row.type.trim() || 'General';
+  miscStatusRows.filter((row) => text(row.description)).forEach((row) => {
+    const key = text(row.type) || 'General';
     const existing = statusGroups.find(([type]) => type === key);
     if (existing) existing[1].push(row.description);
     else statusGroups.push([key, [row.description]]);
   });
 
-  const certRows = certsAuditsRows.filter((row) => row.Title.trim());
-  const logRows = logbookRows.filter((row) => row.Item.trim());
+  const certRows = certsAuditsRows.filter((row) => text(row.Title));
+  const logRows = logbookRows.filter((row) => text(row.Item));
 
   const voyageSection = currentVoyages.length > 0
     ? section('Voyage', `
@@ -273,7 +290,7 @@ const getSprString = ({
     ? emptyNote('No crew onboard yet.')
     : `<div>
         ${activeOnboard.map((row) => {
-          const signedOn = signedOnNames.has(row.Name.trim().toLowerCase());
+          const signedOn = signedOnNames.has(text(row.Name).toLowerCase());
           return `
             <div style="${css({
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0',
@@ -288,7 +305,7 @@ const getSprString = ({
         }).join('')}
         ${signedOff.map((m, index) => {
           const role = originalOnboard.find(
-            (o) => o.Name.trim().toLowerCase() === m.Name.trim().toLowerCase()
+            (o) => text(o.Name).toLowerCase() === text(m.Name).toLowerCase()
           )?.Role ?? '';
           return `
             <div style="${css({
@@ -372,4 +389,4 @@ const getSprString = ({
     </div>`;
 };
 
-module.exports = {getSprString};
+module.exports = {getSprString, cleanRecipients};

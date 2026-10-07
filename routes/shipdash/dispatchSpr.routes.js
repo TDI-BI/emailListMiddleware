@@ -5,7 +5,7 @@ const {requireAuth} = require("../../utils/getAuth");
 const {authForSite} = require("../../utils/authForSite");
 const {getAccessTokenTdiApi} = require("../../utils/getTokens");
 const {sendEmail} = require("../../utils/sendEmail");
-const {getSprString} = require("../../utils/getSprString");
+const {getSprString, cleanRecipients} = require("../../utils/getSprString");
 const {getVesselName} = require("../../utils/getVesselName");
 
 router.post("/shipdash/dispatchSpr", requireAuth, async (req, res) => {
@@ -36,7 +36,11 @@ router.post("/shipdash/dispatchSpr", requireAuth, async (req, res) => {
 
     const recipients = isDev
         ? ["parkerseeley@tdi-bi.com"] //this is the local list
-        : reportData.notificationList;
+        : cleanRecipients(reportData?.notificationList);
+
+    if (recipients.length === 0) {
+        return res.status(400).json({error: "No recipients in notificationList"});
+    }
 
     const accessToken = await getAccessTokenTdiApi();
     const htmlBody = getSprString(reportData, vesselName);
