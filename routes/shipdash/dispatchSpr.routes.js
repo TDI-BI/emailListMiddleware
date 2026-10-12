@@ -34,21 +34,32 @@ router.post("/shipdash/dispatchSpr", requireAuth, async (req, res) => {
     const vesselName = getVesselName(siteName);
 
 
-    const recipients = isDev
-        ? ["parkerseeley@tdi-bi.com"] //this is the local list
-        : cleanRecipients(reportData?.notificationList);
-
-    if (recipients.length === 0) {
-        return res.status(400).json({error: "No recipients in notificationList"});
-    }
+    // every SPR also goes to the submitter and the DPR inbox (DPR inbox skipped in dev to keep test mail out of it)
+    const recipients = [...new Map(
+        [
+            ...(isDev
+                ? ["parkerseeley@tdi-bi.com"] //this is the local list
+                : cleanRecipients(reportData?.notificationList)),
+            req.user.upn,
+            ...(isDev ? [] : ["dpr@tdi-bi.com"]),
+        ]
+            .filter(Boolean)
+            .map((address) => [address.toLowerCase(), address])
+    ).values()];
 
     const accessToken = await getAccessTokenTdiApi();
     const htmlBody = getSprString(reportData, vesselName);
+
+    // reportDate is client-supplied (YYYY-MM-DD); fall back to today if it's missing or malformed
+    const parsedReportDate = new Date(`${reportData?.reportDate}T00:00:00`);
+    const subjectDate = (Number.isNaN(parsedReportDate.getTime()) ? new Date() : parsedReportDate)
+        .toLocaleDateString("en-US", {month: "long", day: "numeric"});
+
     await sendEmail(
         accessToken,
         "no-reply@tdi-bi.com",
         recipients,
-        `${isDev ? 'FROM DEV MODE - NOT REAL REPORT - ' : ''}SPR Report`,
+        `${isDev ? 'FROM DEV MODE - NOT REAL REPORT - ' : ''}${vesselName} SPR ${subjectDate}`,
         htmlBody,
         null,
     );
