@@ -8,6 +8,8 @@ const { sendEmail } = require('../../utils/sendEmail');
 const { getSprString, cleanRecipients } = require('../../utils/getSprString');
 const { getVesselName } = require('../../utils/getVesselName');
 
+const TEST_SITES = ['shipdash_devenv'];
+
 router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
   console.log('Verified user:', req.user.upn);
 
@@ -33,20 +35,27 @@ router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
 
   const vesselName = getVesselName(siteName);
 
-  // every SPR also goes to the submitter and the DPR inbox (DPR inbox skipped in dev to keep test mail out of it)
+  // mock vessel sites act as a debug mode in prod: mail only the notificationList, never the submitter or DPR inbox
+  const isTestSite = TEST_SITES.includes(siteName?.toLowerCase());
+
+  // every real SPR also goes to the submitter and the DPR inbox (DPR inbox skipped in dev to keep test mail out of it)
   const recipients = [
     ...new Map(
       [
         ...(isDev
           ? ['parkerseeley@tdi-bi.com'] //this is the local list
           : cleanRecipients(reportData?.notificationList)),
-        req.user.upn,
-        ...(isDev ? [] : ['dpr@tdi-bi.com']),
+        ...(isTestSite ? [] : [req.user.upn]),
+        ...(isDev || isTestSite ? [] : ['dpr@tdi-bi.com']),
       ]
         .filter(Boolean)
         .map(address => [address.toLowerCase(), address])
     ).values(),
   ];
+
+  if (recipients.length === 0) {
+    return res.status(400).json({ error: 'No recipients in notificationList' });
+  }
 
   const accessToken = await getAccessTokenTdiApi();
   const htmlBody = getSprString(reportData, vesselName);
