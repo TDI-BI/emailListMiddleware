@@ -13,11 +13,14 @@ const TEST_SITES = ['shipdash_devenv'];
 router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
   console.log('Verified user:', req.user.upn);
 
-  let reportData;
-  try {
-    reportData = JSON.parse(req.headers['x-report-data']);
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid X-Report-Data header' });
+  // report now arrives as the JSON body; X-Report-Data header kept as a fallback until every site's frontend is updated
+  let reportData = req.body;
+  if (!reportData || typeof reportData !== 'object' || Object.keys(reportData).length === 0) {
+    try {
+      reportData = JSON.parse(req.headers['x-report-data']);
+    } catch (err) {
+      return res.status(400).json({ error: 'Missing or invalid report data' });
+    }
   }
   //console.log("Report data:", reportData);
 
@@ -78,7 +81,6 @@ router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
   return res.json({
     received: true,
     upn: req.user.upn,
-    reportData,
     siteOrigin,
     siteName,
   });
