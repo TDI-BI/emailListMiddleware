@@ -182,4 +182,112 @@ router.get('/getPosition', async (req, res) => {
   }
 });
 
+// Fleet key → vessel's shipdash SharePoint site
+const FLEET_SITES = {
+  brooks: 'shipdash',
+  emma: 'emmashipdash',
+  gyre: 'gyreshipdash',
+  nautilus: 'nautshipdash',
+  proteus: 'proteusshipdash',
+};
+
+/**
+ * Fetch the newest position on a site that isn't the 0,0 placeholder
+ * @param {string} accessToken - Microsoft 365 access token
+ * @param {string} site - Site name (e.g., 'gyreshipdash')
+ * @returns {Promise<Object|null>} { pos: { latitude, longitude }, time } or null if none found
+ */
+const fetchLatestValidPosition = async (accessToken, site) => {
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const siteResponse = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/tdibrooks.sharepoint.com:/sites/${site}`,
+    { headers }
+  );
+  if (!siteResponse.ok) {
+    throw new Error(`Failed to get site: ${siteResponse.statusText}`);
+  }
+  const { id: siteId } = await siteResponse.json();
+
+  // Grab a small window newest → oldest so we can skip any 0,0 rows at the top
+  const listResponse = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/Positions/items?$expand=fields&$orderby=fields/Date desc&$top=25`,
+    { headers }
+  );
+  if (!listResponse.ok) {
+    throw new Error(`Failed to get list items: ${listResponse.statusText}`);
+  }
+  const listData = await listResponse.json();
+
+  for (const item of listData.value) {
+    const latitude = Number(item.fields.Latitude);
+    const longitude = Number(item.fields.Longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+    if (latitude === 0 && longitude === 0) continue;
+
+    return { pos: { latitude, longitude }, time: item.fields.Date || null };
+  }
+
+  return null;
+};
+
+/**
+ * GET /getFleetPositions
+ * Returns the latest non-0,0 position for each requested vessel, keyed by vessel
+ * e.g. { brooks: { pos: { latitude, longitude }, time }, gyre: null, ... }
+ * A vessel is null if it has no valid position or its lookup failed.
+ * Query params:
+ *   - sites: comma-separated site names (e.g. shipdash,nautshipdash); defaults to the whole fleet.
+ *            Only FLEET_SITES are allowed since this route is public.
+ */
+router.get('/getFleetPositions', async (req, res) => {
+  try {
+    const vesselBySite = Object.fromEntries(
+      Object.entries(FLEET_SITES).map(([vessel, site]) => [site, vessel])
+    );
+
+    let vessels = Object.keys(FLEET_SITES);
+    if (req.query.sites) {
+      const requested = [
+        ...new Set(String(req.query.sites).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)),
+      ];
+      const unknown = requested.filter(site => !vesselBySite[site]);
+      if (unknown.length > 0) {
+        return res.status(400).json({
+          error: `Unknown site(s): ${unknown.join(', ')}`,
+        });
+      }
+      vessels = requested.map(site => vesselBySite[site]);
+    }
+
+    const accessToken = await getAccessTokenTdiApi();
+
+    const results = await Promise.allSettled(
+      vessels.map(vessel => fetchLatestValidPosition(accessToken, FLEET_SITES[vessel]))
+    );
+
+    const positions = {};
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        console.error(`Error fetching position for ${vessels[i]}:`, result.reason);
+        positions[vessels[i]] = null;
+      } else {
+        positions[vessels[i]] = result.value;
+      }
+    });
+
+    res.status(200).json(positions);
+  } catch (error) {
+    console.error('Error in getFleetPositions:', error);
+
+    res.status(500).json({
+      error: 'Failed to fetch fleet positions',
+      details: error.message,
+    });
+  }
+});
+
 module.exports = router;
