@@ -38,10 +38,42 @@ router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
 
   const vesselName = getVesselName(siteName);
 
+  // dispatch from the vessel's own mailbox and copy its crew inboxes; dev env and unknown sites fall back to no-reply
+  let fromEmail;
+  let vesselRecipients = [];
+  switch (vesselName) {
+    case 'Gyre':
+      fromEmail = 'gyre@tdi-bi.com';
+      vesselRecipients = ['mastergyre@tdi-bi.com'];
+      break;
+    case 'Brooks McCall':
+      fromEmail = 'brooksmccall@tdi-bi.com';
+      vesselRecipients = ['masterbmcc@tdi-bi.com'];
+      break;
+    case 'Proteus':
+      fromEmail = 'proteus@tdi-bi.com';
+      vesselRecipients = ['masterproteus@tdi-bi.com'];
+      break;
+    case 'Nautilus':
+      fromEmail = 'nautilus@tdi-bi.com';
+      vesselRecipients = [
+        'masternautilus@tdi-bi.com',
+        'engineernautilus@tdi-bi.com',
+        'nautilus@tdi-bi.com',
+      ];
+      break;
+    case 'Emma McCall':
+      fromEmail = 'emmamccall@tdi-bi.com';
+      vesselRecipients = ['masteremma@tdi-bi.com'];
+      break;
+    default:
+      fromEmail = 'no-reply@tdi-bi.com';
+  }
+
   // mock vessel sites act as a debug mode in prod: mail only the notificationList, never the submitter or DPR inbox
   const isTestSite = TEST_SITES.includes(siteName?.toLowerCase());
 
-  // every real SPR also goes to the submitter and the DPR inbox (DPR inbox skipped in dev to keep test mail out of it)
+  // every real SPR also goes to the submitter, the vessel's crew inboxes and the DPR inbox (crew and DPR inboxes skipped in dev to keep test mail out of them)
   const recipients = [
     ...new Map(
       [
@@ -49,6 +81,7 @@ router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
           ? ['parkerseeley@tdi-bi.com'] //this is the local list
           : cleanRecipients(reportData?.notificationList)),
         ...(isTestSite ? [] : [req.user.upn]),
+        ...(isDev || isTestSite ? [] : vesselRecipients),
         ...(isDev || isTestSite ? [] : ['dpr@tdi-bi.com']),
       ]
         .filter(Boolean)
@@ -71,7 +104,7 @@ router.post('/shipdash/dispatchSpr', requireAuth, async (req, res) => {
 
   await sendEmail(
     accessToken,
-    'no-reply@tdi-bi.com',
+    fromEmail,
     recipients,
     `${isDev ? 'FROM DEV MODE - NOT REAL REPORT - ' : ''}${vesselName} SPR ${subjectDate}`,
     htmlBody,
